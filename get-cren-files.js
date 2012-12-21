@@ -73,6 +73,31 @@ function getObject() {
 	req.end();
 }
 /*
+
+>> Get select fields from certain Entries in the Active_Agent Table <<
+curl                                         \
+        --digest                                \
+        --user-agent "MyCurlClient/1.0"         \
+        -o "./agents.xml"                    \
+        --show-error                            \
+        --dump-header ./headers.txt          \
+        -u "lynxgeo:mapperjm"                         \
+        --header "RETS-Version: RETS/1.7.2"     \
+        --cookie-jar ./cookies.txt           \
+        --cookie ./cookies.txt               \
+        --data Format=COMPACT\
+        --data SearchType=ActiveAgent        \
+       --data Class=ActiveAgent \
+          --data StandardNames=0   \
+       --data QueryType=DMQL2  \
+       --data Count=1  \
+          --data Select="U_AgentID,U_Status,U_UserFirstName,U_UserLastName"  \
+    --data Query="(U_Status=M,S)"   \
+          --data Limit=NONE \
+          "http://cren.rets.fnismls.com/rets/fnisrets.aspx/CREN/search"
+
+
+>> Get Thumbnail for MLS 666544 <<
 curl                                         \
         --digest  --user-agent "MyCurlClient/1.0"         \
            -o "./photo1.jpg"                    \
