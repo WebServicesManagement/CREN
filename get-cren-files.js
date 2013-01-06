@@ -1,18 +1,23 @@
 var http = require('http');
 var fs = require('fs');
 var xml2js = require('xml2js');
-var cradle = require('cradle');
-var c = new(cradle.Connection);
 var StringDecoder = require('string_decoder').StringDecoder;
 var decoder = new StringDecoder('utf8');
 var csv = require('csv');
-var db = c.database('cren');
 
+var cradle = require('cradle');
+var c = new(cradle.Connection);
+var db = c.database('cren');
 db.create();
  
 var username = "lynxgeo";
 var password = "mapperjm";
 
+var currentTime = new Date();
+var month = currentTime.getMonth() + 1;
+var day = currentTime.getDate();
+var year = currentTime.getFullYear();
+var todaysDate = month + "/" + day + "/" + year;
 
 /***** LOGIN ******/
 var options = {
@@ -36,37 +41,6 @@ var req = http.request(options, function(res) {
 });
 
 req.end();
-
-function compareAgentLists(rebAgents,crenAgents){
-	var rebAgentData;
-	console.log('Starting compare: '+ rebAgents[1]);
-	for (var i=0;i<rebAgents.length;i++)
-	{
-		rebAgentData 	= rebAgents[i];
-		rebFirstName 	= rebAgentData[1];
-		rebLastName 	= rebAgentData[2];
-		rebOffice 		= rebAgentData[3];
-//		console.log('SEARCHING: '+ rebLastName);
-		for (var j=0;j<crenAgents.length;j++)
-		{
-			row 			= crenAgents[j].split('\t');
-			agentId			= row[1];
-			agentStatus		= row[2];
-			agentFirstName	= row[3];
-			agentLastName	= row[4];
-			agentOffice		= row[5];
-			if((rebLastName.toLowerCase().replace(/[^\w\s]/gi, '') == agentLastName.toLowerCase().replace(/[^\w\s]/gi, '')
-				&& rebOffice.toLowerCase().replace(/[^\w\s]/gi, '') == agentOffice.toLowerCase().replace(/[^\w\s]/gi, ''))
-			|| (rebLastName.toLowerCase().replace(/[^\w\s]/gi, '') == agentLastName.toLowerCase().replace(/[^\w\s]/gi, '')
-				&& rebFirstName.toLowerCase().replace(/[^\w\s]/gi, '') == agentFirstName.toLowerCase().replace(/[^\w\s]/gi, ''))){
-				insertSingleAgent(row,true);
-				console.log('FOUND: '+ agentLastName);
-				console.log('REB: office:'+ rebOffice + ' first:'+ rebFirstName  + ' last:'+ rebLastName );
-				console.log('CREN: office:'+ agentOffice + ' first:'+ agentFirstName + ' last:'+ agentLastName);
-			}
-		}
-	}
-}
 
 function getCRENAgents() {
 	var crenAgents;
@@ -124,6 +98,7 @@ function insertSingleAgent(agentArray,verified){
 		AgentLastName	: agentLastName,
 		AgentFirstName	: agentFirstName,
 		AgentOffice		: agentOffice,
+		CreatedDate		: todaysDate,
 		verified		: verified
 	});
 }
@@ -141,6 +116,7 @@ function insertAllAgents(agentArray){
 			AgentLastName	: agentLastName,
 			AgentFirstName	: agentFirstName,
 			AgentOffice		: agentOffice,
+			CreatedDate		: todaysDate,
 			verified		: false
 		});
 	}
@@ -149,12 +125,8 @@ function insertAllAgents(agentArray){
 function getActiveREBs(crenAgents){
 	var	rebAgents = new Array();
 	
-	var options = {
-	  hostname: 'dl.dropbox.com',
-	  path: '/u/68198810/ActiveREBs_PUBLIC_1212.xls?dl=1'
-	};
 	var resData = '';
-	http.get("http://dl.dropbox.com/u/68198810/ActiveREBs_PUBLIC_1212.csv", function(res) {
+	http.get("http://dl.dropbox.com/s/j3w7py5mosp62us/Active_REBs_PUBLIC_0113.csv", function(res) {
 		console.log('LOADING REB Agents...');
 		res.on('data', function (chunk) {
 			resData += decoder.write(chunk);
@@ -182,20 +154,58 @@ function getActiveREBs(crenAgents){
 	});
 	return rebAgents;
 }
+
+function compareAgentLists(rebAgents,crenAgents){
+	var rebAgentData;
+	console.log('Starting compare: '+ rebAgents[1]);
+	for (var i=0;i<rebAgents.length;i++)
+	{
+		rebAgentData 	= rebAgents[i];
+		rebFirstName 	= rebAgentData[1];
+		rebLastName 	= rebAgentData[2];
+		rebOffice 		= rebAgentData[3];
+		
+		for (var j=0;j<crenAgents.length;j++)
+		{
+			row 			= crenAgents[j].split('\t');
+			agentId			= row[1];
+			agentStatus		= row[2];
+			agentFirstName	= row[3];
+			agentLastName	= row[4];
+			agentOffice		= row[5];
+			if((rebLastName.toLowerCase().replace(/[^\w\s]/gi, '') == agentLastName.toLowerCase().replace(/[^\w\s]/gi, '')
+				&& rebOffice.toLowerCase().replace(/[^\w\s]/gi, '') == agentOffice.toLowerCase().replace(/[^\w\s]/gi, ''))
+			|| (rebLastName.toLowerCase().replace(/[^\w\s]/gi, '') == agentLastName.toLowerCase().replace(/[^\w\s]/gi, '')
+				&& rebFirstName.toLowerCase().replace(/[^\w\s]/gi, '') == agentFirstName.toLowerCase().replace(/[^\w\s]/gi, ''))){
+				insertSingleAgent(row,true);
+				console.log('FOUND: '+ agentLastName);
+				console.log('REB: office:'+ rebOffice + ' first:'+ rebFirstName  + ' last:'+ rebLastName );
+				console.log('CREN: office:'+ agentOffice + ' first:'+ agentFirstName + ' last:'+ agentLastName);
+			}
+		}
+	}
+	
+	createViews();
+}
+
+function createViews(){
+	db.save('_design/agent', {
+		views: {
+			verified: {
+				map: "function (doc) {if(doc.verified && doc.CreatedDate == '" + todaysDate + "'){emit(doc.AgentFirstName + ' ' + doc.AgentLastName , doc)}}"
+			},
+			unverified: {
+				map: "function (doc) {if(!doc.verified && doc.CreatedDate == '" + todaysDate + "'){emit(doc.AgentFirstName + ' ' + doc.AgentLastName , doc)}}"
+			}
+		}
+	});
+}
 /*
-http://dl.dropbox.com/u/68198810/ActiveREBs_PUBLIC_1212.xls
+http://127.0.0.1:5984/_utils/database.html?cren/_design/agent/_view/unverified
+http://127.0.0.1:5984/cren/_design/agent/_view/verified
+test file
+http://dl.dropbox.com/u/68198810/ActiveREBs_PUBLIC_1212.csv
 
-curl                                         \
-        --digest  --user-agent "MyCurlClient/1.0"         \
-           -o "./photo1.jpg"                    \
-        --dump-header ./headers.txt          \
-        -u "lynxgeo:mapperjm"                         \
-        --header "RETS-Version: RETS/1.7.2"     \
-        --cookie-jar ./cookies.txt           \
-        --cookie ./cookies.txt               \
-        --data Resource=Property         \
-        --data Type=Thumbnail \
-        --data ID=666544 \
-          "http://cren.rets.fnismls.com/rets/fnisrets.aspx/CREN/getCRENAgents"
-
+new file
+http://dl.dropbox.com/s/j3w7py5mosp62us/Active_REBs_PUBLIC_0113.csv
 */
