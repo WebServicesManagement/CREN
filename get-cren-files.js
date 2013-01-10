@@ -157,10 +157,11 @@ function compareAgentLists(rebAgents,crenAgents){
 			rebLastName 	= rebAgentData[2];
 			rebOffice 		= rebAgentData[3];
 
-			if((rebLastName.toLowerCase().replace(/[^\w\s]/gi, '') == agentLastName.toLowerCase().replace(/[^\w\s]/gi, '')
-				&& rebOffice.toLowerCase().replace(/[^\w\s]/gi, '') == agentOffice.toLowerCase().replace(/[^\w\s]/gi, ''))
-			|| (rebLastName.toLowerCase().replace(/[^\w\s]/gi, '') == agentLastName.toLowerCase().replace(/[^\w\s]/gi, '')
-				&& rebFirstName.toLowerCase().replace(/[^\w\s]/gi, '') == agentFirstName.toLowerCase().replace(/[^\w\s]/gi, ''))){
+			if(rebLastName.toLowerCase().replace(/[^\w\s]/gi, '') == agentLastName.toLowerCase().replace(/[^\w\s]/gi, '')
+				&& 
+				(rebOffice.toLowerCase().replace(/[^\w\s]/gi, '') == agentOffice.toLowerCase().replace(/[^\w\s]/gi, '')
+				||
+				rebFirstName.toLowerCase().replace(/[^\w\s]/gi, '').indexOf(agentFirstName.toLowerCase().replace(/[^\w\s]/gi, '').substring(0,2)) != -1)){
 				found = true;
 			}
 		}
@@ -209,7 +210,7 @@ function createViews(){
 				map: "function (doc) {if(!doc.verified && doc.CreatedDate == '" + todaysDate + "'){emit(doc.AgentFirstName + ' ' + doc.AgentLastName , doc)}}"
 			}
 		}
-	}, function(res){
+	}, function(err,res){
 		var req = http.get('http://127.0.0.1:5984/cren/_design/agent/_view/unverified',function(res) {
 			var response = '';
 			res.on('data', function (chunk) {
