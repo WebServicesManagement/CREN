@@ -21,8 +21,8 @@ var todaysDate = month + "/" + day + "/" + year;
 
 var email   = require("emailjs/email");
 var server  = email.server.connect({
-   user:    "pcjones10@gmail.com", 
-   password:"Lacrosse1", 
+   user:    "sysadmin@webservicesmanagement.com", 
+   password:"90p3rc3nt", 
    host:    "smtp.gmail.com", 
    ssl:     true
 
@@ -58,7 +58,7 @@ function getCRENAgents() {
 	var options = {
 	  hostname: 'cren.rets.fnismls.com',
 	  //  path: '/rets/fnisrets.aspx/CREN/GetMetadata?rets-version=rets/1.7.2&Format=COMPACT&Type=METADATA-SYSTEM&ID=*',
-	  path: '/rets/fnisrets.aspx/CREN/search?rets-version=rets/1.7.2&Format=COMPACT&QueryType=DMQL2&SearchType=ActiveAgent&class=ActiveAgent&StandardNames=0&Query=(U_Status=M,S)&Select=U_AgentID,U_Status,U_UserFirstName,U_UserLastName,AO_OrganizationName&Limit=NONE&ID=*',
+	  path: '/rets/fnisrets.aspx/CREN/search?rets-version=rets/1.7.2&Format=COMPACT&QueryType=DMQL2&SearchType=ActiveAgent&class=ActiveAgent&StandardNames=0&Query=(U_Status=M,S)&Select=U_AgentID,U_Status,U_UserFirstName,U_UserLastName,AO_OrganizationName,U_PhoneNumber1&Limit=NONE&ID=*',
 	  port: 80,
 	  method: 'GET',
 	  headers: {
@@ -79,9 +79,9 @@ function getCRENAgents() {
 			resData += chunk;
 		});
 		res.on('end', function () {  
-			console.log('CREN Agents Loaded.');
 			parser.parseString(resData, function (err, result) {
 				crenAgents = result.RETS.DATA;
+				console.log('CREN Agents Loaded. '+crenAgents.length);
 			});
 			getActiveREBs(crenAgents);
 		});
@@ -148,6 +148,7 @@ function compareAgentLists(rebAgents,crenAgents){
 		agentFirstName	= row[3];
 		agentLastName	= row[4];
 		agentOffice		= row[5];
+		agentPhone		= row[6];
 		
 		var found = false;
 		for (var i=0;i<rebAgents.length;i++)
@@ -156,13 +157,17 @@ function compareAgentLists(rebAgents,crenAgents){
 			rebFirstName 	= rebAgentData[1];
 			rebLastName 	= rebAgentData[2];
 			rebOffice 		= rebAgentData[3];
+			rebPhone 		= rebAgentData[9];
 
 			if(rebLastName.toLowerCase().replace(/[^\w\s]/gi, '') == agentLastName.toLowerCase().replace(/[^\w\s]/gi, '')
 				&& 
-				(rebOffice.toLowerCase().replace(/[^\w\s]/gi, '') == agentOffice.toLowerCase().replace(/[^\w\s]/gi, '')
+				((rebOffice.toLowerCase().replace(/[^\w\s]/gi, '') == agentOffice.toLowerCase().replace(/[^\w\s]/gi, '')
 				||
-				rebFirstName.toLowerCase().replace(/[^\w\s]/gi, '').indexOf(agentFirstName.toLowerCase().replace(/[^\w\s]/gi, '').substring(0,2)) != -1)){
-				found = true;
+				rebFirstName.toLowerCase().replace(/[^\w\s]/gi, '').indexOf(agentFirstName.toLowerCase().replace(/[^\w\s]/gi, '').substring(0,2)) != -1)
+				||
+				rebPhone.indexOf(agentPhone) != -1)
+				){
+					found = true;
 			}
 		}
 		
@@ -225,7 +230,10 @@ function createViews(){
 				console.log('RES:'+response);
 				invalidAgents.sort();
 				emailStr += invalidAgents.join('\n');
-				sendEmail(emailStr);
+				
+				if(invalidAgents.length != 0){
+					sendEmail(emailStr);
+				}
 			});
 		});
 	});
@@ -234,10 +242,10 @@ function createViews(){
 function sendEmail(message){
 	server.send({
 	text:    message, 
-	from:    "you <pcjones10@gmail.com>", 
+	from:    "sysadmin@webservicesmanagement.com", 
 	to:      "someone <pcjones10@gmail.com>",
-	cc:      "pcjones10 <pcjones10@gmail.com>",
-	subject: "CREN Agents not found in REB file"
+	cc:      "pcjones10@gmail.com,nathan@webservicesmanagement.com,sam@thewebmgr.com",
+	subject: "CREN Agents not found in REB file for " + todaysDate
 	}, function(err, message) { console.log(err || message); });
 }
 
