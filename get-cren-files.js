@@ -166,6 +166,10 @@ function compareAgentLists(rebAgents,crenAgents){
 			}
 		}
 		
+		if(!found){
+			emailStr += '\r\n' + agentFirstName.toUpperCase() + ' ' + agentLastName.toUpperCase();
+		}
+		
 		row[6] = found;
 		agentsToInsert.push(row);
 	}
@@ -219,7 +223,7 @@ function createViews(){
 			});
 			res.on('end', function(e) {
 				console.log('RES:'+response);
-				sendEmail(buidlEmailMessage(response));
+				sendEmail(emailStr);
 			});
 		});
 	});
