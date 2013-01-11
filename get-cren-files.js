@@ -28,7 +28,7 @@ var server  = email.server.connect({
 
 });
 var emailStr = 'Agents not found in REB file:\n';
-
+var invalidAgents = new Array();
 /***** LOGIN ******/
 var options = {
   hostname: 'cren.rets.fnismls.com',
@@ -139,7 +139,7 @@ function compareAgentLists(rebAgents,crenAgents){
 	var rebAgentData;
 	console.log('Starting compare... ');
 	var agentsToInsert = new Array();
-	
+
 	for (var j=0;j<crenAgents.length;j++)
 	{
 		row 			= crenAgents[j].split('\t');
@@ -167,7 +167,7 @@ function compareAgentLists(rebAgents,crenAgents){
 		}
 		
 		if(!found){
-			emailStr += '\r\n' + agentFirstName.toUpperCase() + ' ' + agentLastName.toUpperCase();
+			invalidAgents.push(agentFirstName.toUpperCase() + ' ' + agentLastName.toUpperCase());
 		}
 		
 		row[6] = found;
@@ -223,6 +223,8 @@ function createViews(){
 			});
 			res.on('end', function(e) {
 				console.log('RES:'+response);
+				invalidAgents.sort();
+				emailStr += invalidAgents.join('\n');
 				sendEmail(emailStr);
 			});
 		});
