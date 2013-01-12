@@ -232,20 +232,20 @@ function createViews(){
 				emailStr += invalidAgents.join('\n');
 				
 				if(invalidAgents.length != 0){
-					sendEmail(emailStr);
+					sendEmail(invalidAgents.length,emailStr);
 				}
 			});
 		});
 	});
 }
 
-function sendEmail(message){
+function sendEmail(agentCount,message){
 	server.send({
 	text:    message, 
 	from:    "sysadmin@webservicesmanagement.com", 
-	to:      "someone <pcjones10@gmail.com>",
+	to:      "someone <pcjones10@gmail.com>", 
 	cc:      "pcjones10@gmail.com,nathan@webservicesmanagement.com,sam@thewebmgr.com",
-	subject: "CREN Agents not found in REB file for " + todaysDate
+	subject: agentCount + " CREN Agents not found in REB file for " + todaysDate
 	}, function(err, message) { console.log(err || message); });
 }
 
