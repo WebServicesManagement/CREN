@@ -1,3 +1,4 @@
+console.log('JOB STARTED');
 var http = require('http');
 var fs = require('fs');
 var xml2js = require('xml2js');
@@ -29,6 +30,7 @@ var server  = email.server.connect({
 });
 var emailStr = 'Agents not found in REB file:\n';
 var invalidAgents = new Array();
+var semiInvalidAgents = new Array();
 /***** LOGIN ******/
 var options = {
   hostname: 'cren.rets.fnismls.com',
@@ -48,6 +50,9 @@ var req = http.request(options, function(res) {
 	res.on('end', function(e) {
 		getCRENAgents();
 	});
+	req.on('error', function (err) {
+		console.log(err);
+	});
 });
 
 req.end();
@@ -58,7 +63,7 @@ function getCRENAgents() {
 	var options = {
 	  hostname: 'cren.rets.fnismls.com',
 	  //  path: '/rets/fnisrets.aspx/CREN/GetMetadata?rets-version=rets/1.7.2&Format=COMPACT&Type=METADATA-SYSTEM&ID=*',
-	  path: '/rets/fnisrets.aspx/CREN/search?rets-version=rets/1.7.2&Format=COMPACT&QueryType=DMQL2&SearchType=ActiveAgent&class=ActiveAgent&StandardNames=0&Query=(U_Status=M,S)&Select=U_AgentID,U_Status,U_UserFirstName,U_UserLastName,AO_OrganizationName,U_PhoneNumber1&Limit=NONE&ID=*',
+	  path: '/rets/fnisrets.aspx/CREN/search?rets-version=rets/1.7.2&Format=COMPACT&QueryType=DMQL2&SearchType=ActiveAgent&class=ActiveAgent&StandardNames=0&Query=(U_Status=M,S)&Select=U_AgentLicenseID,U_Status,U_UserFirstName,U_UserLastName,AO_OrganizationName,U_PhoneNumber1&Limit=NONE&ID=*',
 	  port: 80,
 	  method: 'GET',
 	  headers: {
@@ -101,7 +106,7 @@ function getActiveREBs(crenAgents){
 	var	rebAgents = new Array();
 	
 	var resData = '';
-	http.get("http://dl.dropbox.com/s/j3w7py5mosp62us/Active_REBs_PUBLIC_0113.csv", function(res) {
+	http.get("http://dl.dropboxusercontent.com/s/xqk6hdcgy0403p0/Active_REBs_PUBLIC.csv.csv?dl=1", function(res) {
 		console.log('LOADING REB Agents...');
 		res.on('data', function (chunk) {
 			resData += decoder.write(chunk);
@@ -114,6 +119,7 @@ function getActiveREBs(crenAgents){
 				return data;
 			})
 			.on('record', function(data,index){
+				console.log(data);
 				rebAgents.push(data);
 			})
 			.on('end', function(count){
@@ -143,7 +149,7 @@ function compareAgentLists(rebAgents,crenAgents){
 	for (var j=0;j<crenAgents.length;j++)
 	{
 		row 			= crenAgents[j].split('\t');
-		agentId			= row[1];
+		agentLicenseId	= row[1];
 		agentStatus		= row[2];
 		agentFirstName	= row[3];
 		agentLastName	= row[4];
@@ -158,7 +164,14 @@ function compareAgentLists(rebAgents,crenAgents){
 			rebLastName 	= rebAgentData[2];
 			rebOffice 		= rebAgentData[3];
 			rebPhone 		= rebAgentData[9];
-
+			rebLicenseId 	= rebAgentData[10];
+			
+			if(agentLicenseId == rebLicenseId){
+				found = true;
+				break;
+				
+			}
+			
 			if(rebLastName.toLowerCase().replace(/[^\w\s]/gi, '') == agentLastName.toLowerCase().replace(/[^\w\s]/gi, '')
 				&& 
 				((rebOffice.toLowerCase().replace(/[^\w\s]/gi, '') == agentOffice.toLowerCase().replace(/[^\w\s]/gi, '')
@@ -167,6 +180,25 @@ function compareAgentLists(rebAgents,crenAgents){
 				||
 				rebPhone.indexOf(agentPhone) != -1)
 				){
+					if(semiInvalidAgents[semiInvalidAgents.length - 1] === "undefined" || semiInvalidAgents.length == 0){
+						semiInvalidAgents.push('CREN DATA: Name = ' + agentFirstName.toUpperCase() + 
+												' ' + agentLastName.toUpperCase() + 
+												' Office = ' + agentOffice.toUpperCase() + 
+												' Phone = ' + agentPhone.toUpperCase() + 
+												' License = ' + agentLicenseId.toUpperCase() + 
+												'\nREB DATA: Name = ' + rebFirstName + 
+												' ' + rebLastName.toUpperCase() + 
+												' Office = ' + rebOffice.toUpperCase() + 
+												' Phone = ' + rebPhone.toUpperCase() + 
+												' License =' + rebLicenseId + '\n');
+					}else if(semiInvalidAgents[semiInvalidAgents.length - 1].indexOf(agentLicenseId) != -1){
+						semiInvalidAgents[semiInvalidAgents.length] += '\nREB DATA: Name = ' + rebFirstName + 
+												' ' + rebLastName.toUpperCase() + 
+												' Office = ' + rebOffice.toUpperCase() + 
+												' Phone = ' + rebPhone.toUpperCase() + 
+												' License =' + rebLicenseId + '\n';
+					
+					}
 					found = true;
 			}
 		}
@@ -230,7 +262,7 @@ function createViews(){
 				console.log('RES:'+response);
 				invalidAgents.sort();
 				emailStr += invalidAgents.join('\n');
-				
+				emailStr += '\n\nAgents found but with non matching license #s\n' + semiInvalidAgents.join('\n')
 				if(invalidAgents.length != 0){
 					sendEmail(invalidAgents.length,emailStr);
 				}
@@ -244,7 +276,7 @@ function sendEmail(agentCount,message){
 	text:    message, 
 	from:    "sysadmin@webservicesmanagement.com", 
 	to:      "Jeff Follis <jeff@crenmls.com>,Robin Martinez <robin@crenmls.com>", 
-	cc:      "pcjones10@gmail.com,nathan@webservicesmanagement.com,sam@thewebmgr.com",
+	//to:      "pcjones10@gmail.com",
 	subject: agentCount + " CREN Agents not found in REB file for " + todaysDate
 	}, function(err, message) { console.log(err || message); });
 }
