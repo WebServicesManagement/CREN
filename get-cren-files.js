@@ -1,25 +1,33 @@
 console.log('JOB STARTED');
+
+//http request object
 var http = require('http');
+
+//file system object
 var fs = require('fs');
+
+//xml parser
 var xml2js = require('xml2js');
+
+//string converter
 var StringDecoder = require('string_decoder').StringDecoder;
 var decoder = new StringDecoder('utf8');
+
+//csv utility
 var csv = require('csv');
 
-var cradle = require('cradle');
-var c = new(cradle.Connection);
-var db = c.database('cren');
-db.create();
- 
-var username = "lynxgeo";
-var password = "mapperjm";
+//CREN credentials
+var USERNAME = "lynxgeo";
+var PASSWORD = "mapperjm";
 
+//Store current date
 var currentTime = new Date();
 var month = currentTime.getMonth() + 1;
 var day = currentTime.getDate();
 var year = currentTime.getFullYear();
 var todaysDate = month + "/" + day + "/" + year;
 
+//email credentials for sending confirmation email
 var email   = require("emailjs/email");
 var server  = email.server.connect({
    user:    "sysadmin@webservicesmanagement.com", 
@@ -28,21 +36,26 @@ var server  = email.server.connect({
    ssl:     true
 
 });
+//email response
 var emailStr = 'Agents not found in REB file:\n';
+
+//arrays of agents not found in search
 var invalidAgents = new Array();
 var semiInvalidAgents = new Array();
-/***** LOGIN ******/
+
+//options for logging into CREN server
 var options = {
   hostname: 'cren.rets.fnismls.com',
   path: '/rets/fnisrets.aspx/CREN/login?rets-version=rets/1.7.2',
   port: 80,
   method: 'GET',
   headers: {
-     'Authorization': 'Basic ' + new Buffer(username + ':' + password).toString('base64'),
+     'Authorization': 'Basic ' + new Buffer(USERNAME + ':' + PASSWORD).toString('base64'),
      'User-Agent': 'WSM-CRENdata'
    }
 };
 
+//perform login
 var cookies;
 var req = http.request(options, function(res) {
 	cookies = res.headers['set-cookie'];
@@ -57,9 +70,13 @@ var req = http.request(options, function(res) {
 
 req.end();
 
+/**
+ * Get list of agents from CREN
+ */
 function getCRENAgents() {
 	var crenAgents;
 	
+	//settings for getting agents
 	var options = {
 	  hostname: 'cren.rets.fnismls.com',
 	  //  path: '/rets/fnisrets.aspx/CREN/GetMetadata?rets-version=rets/1.7.2&Format=COMPACT&Type=METADATA-SYSTEM&ID=*',
@@ -67,7 +84,7 @@ function getCRENAgents() {
 	  port: 80,
 	  method: 'GET',
 	  headers: {
-		 'Authorization': 'Basic ' + new Buffer(username + ':' + password).toString('base64'),
+		 'Authorization': 'Basic ' + new Buffer(USERNAME + ':' + PASSWORD).toString('base64'),
 		 'User-Agent': 'WSMCRENdata/1.0',
 		 'Content-Type': 'text/xml',
 		 'RETS-Version': 'RETS/1.7.2',
@@ -77,17 +94,22 @@ function getCRENAgents() {
 	
 	var resData = '';
 	var parser = new xml2js.Parser();
+	
+	//get agents list
 	var req = http.request(options, function(res) {
 		console.log('LOADING CREN Agents...');
 		res.setEncoding('utf8');
 		res.on('data', function (chunk) {
 			resData += chunk;
 		});
-		res.on('end', function () {  
+		res.on('end', function () {
+			//parse xml
 			parser.parseString(resData, function (err, result) {
 				crenAgents = result.RETS.DATA;
 				console.log('CREN Agents Loaded. '+crenAgents.length);
 			});
+			
+			//load REB agents
 			getActiveREBs(crenAgents);
 		});
 	});
@@ -102,10 +124,17 @@ function getCRENAgents() {
 	return;
 }
 
+/**
+ * retrieve REB agents from REB spread sheet on drop box
+ *
+ * @param crenAgents  array of agents retrieved from CREN
+ */
 function getActiveREBs(crenAgents){
 	var	rebAgents = new Array();
 	
 	var resData = '';
+	
+	//send http requet to drop box to get agents spread sheet
 	http.get("http://dl.dropboxusercontent.com/s/xqk6hdcgy0403p0/Active_REBs_PUBLIC.csv.csv?dl=1", function(res) {
 		console.log('LOADING REB Agents...');
 		res.on('data', function (chunk) {
@@ -120,12 +149,18 @@ function getActiveREBs(crenAgents){
 			})
 			.on('record', function(data,index){
 				console.log(data);
+				
+				//add agents to REB array
 				rebAgents.push(data);
 			})
 			.on('end', function(count){
 				console.log('REB Agents Loaded. '+count);
+				
+				//compare CREN array to REB array
 				compareAgentLists(rebAgents,crenAgents);
 				var fs = require('fs');
+				
+				//create local CREN cvs
 				fs.writeFile('CRENagents.cvs', crenAgents.join("\n"), function (err) {
 					if (err) throw err;
 					console.log('It\'s saved!');
@@ -141,6 +176,12 @@ function getActiveREBs(crenAgents){
 	return rebAgents;
 }
 
+/**
+ * compare REB and CREN arrays
+ * 
+ * @param rebAgents  array of REB agents
+ * @param crenAgents  array of CREN agents
+ */
 function compareAgentLists(rebAgents,crenAgents){
 	var rebAgentData;
 	console.log('Starting compare... ');
@@ -156,7 +197,9 @@ function compareAgentLists(rebAgents,crenAgents){
 		agentOffice		= row[5];
 		agentPhone		= row[6];
 		
+		//console.log('********************* NEW AGENT ***************'); 
 		var found = false;
+		var semiFound = false;
 		for (var i=0;i<rebAgents.length;i++)
 		{
 			rebAgentData 	= rebAgents[i];
@@ -166,43 +209,67 @@ function compareAgentLists(rebAgents,crenAgents){
 			rebPhone 		= rebAgentData[9];
 			rebLicenseId 	= rebAgentData[10];
 			
+			//console.log(agentLicenseId + ' == ' + rebLicenseId);
+			
+			//if match on license then exit for loop and check next agent
 			if(agentLicenseId == rebLicenseId){
 				found = true;
+				
+				agent = '';
+				
+				//if found in other matches remove from list
+				if(semiFound){
+					agent = semiInvalidAgents.pop();
+				
+				}
+				
+				//console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@ FOUND @@@@@@@@@@@@@@@@@@@@@@@@@@@ ' + semiInvalidAgents[semiInvalidAgents.length-1]);
+				//console.log(agent); 
 				break;
 				
 			}
 			
+			//if no matching license but matching last name and office or first name or phone then add to potential match list
 			if(rebLastName.toLowerCase().replace(/[^\w\s]/gi, '') == agentLastName.toLowerCase().replace(/[^\w\s]/gi, '')
 				&& 
 				((rebOffice.toLowerCase().replace(/[^\w\s]/gi, '') == agentOffice.toLowerCase().replace(/[^\w\s]/gi, '')
 				||
-				rebFirstName.toLowerCase().replace(/[^\w\s]/gi, '').indexOf(agentFirstName.toLowerCase().replace(/[^\w\s]/gi, '').substring(0,2)) != -1)
+				rebFirstName.toLowerCase().replace(/[^\w\s]/gi, '').indexOf(agentFirstName.toLowerCase().replace(/[^\w\s]/gi, '').substring(0,3)) != -1)
 				||
-				rebPhone.indexOf(agentPhone) != -1)
+				(rebPhone.indexOf(agentPhone) != -1 && agentPhone.length > 5))
 				){
-					if(semiInvalidAgents[semiInvalidAgents.length - 1] === "undefined" || semiInvalidAgents.length == 0){
-						semiInvalidAgents.push('CREN DATA: Name = ' + agentFirstName.toUpperCase() + 
+					//if first match then add new node
+					if(semiFound == false){
+						semiInvalidAgents.push('\nCREN DATA: Name = ' + agentFirstName.toUpperCase() + 
 												' ' + agentLastName.toUpperCase() + 
 												' Office = ' + agentOffice.toUpperCase() + 
 												' Phone = ' + agentPhone.toUpperCase() + 
-												' License = ' + agentLicenseId.toUpperCase() + 
-												'\nREB DATA: Name = ' + rebFirstName + 
-												' ' + rebLastName.toUpperCase() + 
-												' Office = ' + rebOffice.toUpperCase() + 
-												' Phone = ' + rebPhone.toUpperCase() + 
-												' License =' + rebLicenseId + '\n');
-					}else if(semiInvalidAgents[semiInvalidAgents.length - 1].indexOf(agentLicenseId) != -1){
-						semiInvalidAgents[semiInvalidAgents.length] += '\nREB DATA: Name = ' + rebFirstName + 
-												' ' + rebLastName.toUpperCase() + 
-												' Office = ' + rebOffice.toUpperCase() + 
-												' Phone = ' + rebPhone.toUpperCase() + 
-												' License =' + rebLicenseId + '\n';
-					
+												' License = ' + agentLicenseId.toUpperCase());
+												
 					}
+					
+					semiInvalidAgents[semiInvalidAgents.length-1] += '\nREB DATA: Name = ' + rebFirstName + 
+												' ' + rebLastName.toUpperCase() + 
+												' Office = ' + rebOffice.toUpperCase() + 
+												' Phone = ' + rebPhone.toUpperCase() + 
+												' License =' + rebLicenseId;
+												
+					/*console.log(rebLastName.toLowerCase().replace(/[^\w\s]/gi, '') + ' == ' + agentLastName.toLowerCase().replace(/[^\w\s]/gi, '')
+						+ ' && ' +
+						rebOffice.toLowerCase().replace(/[^\w\s]/gi, '') + '  == ' + agentOffice.toLowerCase().replace(/[^\w\s]/gi, '')
+						+ ' || '
+						+ rebFirstName.toLowerCase().replace(/[^\w\s]/gi, '') + ' ' + agentFirstName.toLowerCase().replace(/[^\w\s]/gi, '').substring(0,3)
+						+ ' || '
+						+ rebPhone + ' :: ' + agentPhone);*/
+					
+					semiFound = true;
 					found = true;
+					
 			}
+			
 		}
 		
+		// if not found add to invalid agent list
 		if(!found){
 			invalidAgents.push(agentFirstName.toUpperCase() + ' ' + agentLastName.toUpperCase());
 		}
@@ -211,101 +278,28 @@ function compareAgentLists(rebAgents,crenAgents){
 		agentsToInsert.push(row);
 	}
 	
-	insertVerifiedAgents(agentsToInsert);
-}
-
-function insertVerifiedAgents(agentArray){
-	console.log('Inserting Results...');
-	var agentsToInsert = new Array();
-	for (var i=0;i<agentArray.length;i++)
-	{
-		row 			= agentArray[i];
-		agentId			= row[1];
-		agentStatus		= row[2];
-		agentFirstName	= row[3].toUpperCase();
-		agentLastName	= row[4].toUpperCase();
-		agentOffice		= row[5];
-		verified		= row[6];
-		agentsToInsert.push({
-			_id				: agentId,
-			AgentLastName	: agentLastName,
-			AgentFirstName	: agentFirstName,
-			AgentOffice		: agentOffice,
-			CreatedDate		: todaysDate,
-			verified		: verified
-		});
+	invalidAgents.sort();
+	emailStr += invalidAgents.join('\n');
+	emailStr += '\n\nAgents found but with non matching license #s\n' + semiInvalidAgents.join('\n');
+	
+	//if invalid agents found send email
+	if(invalidAgents.length != 0){
+		sendEmail(invalidAgents.length,emailStr);
 	}
-	db.save(agentsToInsert, function (err, res) {
-		createViews();
-	}); 
 }
 
-function createViews(){
-	console.log('Creating and Sending Email...');
-	db.save('_design/agent', {
-		views: {
-			verified: {
-				map: "function (doc) {if(doc.verified && doc.CreatedDate == '" + todaysDate + "'){emit(doc.AgentFirstName + ' ' + doc.AgentLastName , doc)}}"
-			},
-			unverified: {
-				map: "function (doc) {if(!doc.verified && doc.CreatedDate == '" + todaysDate + "'){emit(doc.AgentFirstName + ' ' + doc.AgentLastName , doc)}}"
-			}
-		}
-	}, function(err,res){
-		var req = http.get('http://127.0.0.1:5984/cren/_design/agent/_view/unverified',function(res) {
-			var response = '';
-			res.on('data', function (chunk) {
-				console.log('chunk:'+decoder.write(chunk));
-				response += decoder.write(chunk);
-			});
-			res.on('end', function(e) {
-				console.log('RES:'+response);
-				invalidAgents.sort();
-				emailStr += invalidAgents.join('\n');
-				emailStr += '\n\nAgents found but with non matching license #s\n' + semiInvalidAgents.join('\n')
-				if(invalidAgents.length != 0){
-					sendEmail(invalidAgents.length,emailStr);
-				}
-			});
-		});
-	});
-}
-
+/**
+ * send email of missing agents
+ * 
+ * @param agentCount  Integer of agents missing
+ * @param message  String of the message to send
+ */
 function sendEmail(agentCount,message){
 	server.send({
 	text:    message, 
 	from:    "sysadmin@webservicesmanagement.com", 
-	to:      "Jeff Follis <jeff@crenmls.com>,Robin Martinez <robin@crenmls.com>", 
-	//to:      "pcjones10@gmail.com",
+	//to:      "Jeff Follis <jeff@crenmls.com>,Robin Martinez <robin@crenmls.com>", 
+	cc:      "pcjones10@gmail.com,nathan@webservicesmanagement.com,sam@thewebmgr.com",
 	subject: agentCount + " CREN Agents not found in REB file for " + todaysDate
 	}, function(err, message) { console.log(err || message); });
 }
-
-function buidlEmailMessage(jsonStr){
-	emailStr += '\r\n' + convertToCSV(jsonStr);
-	return emailStr;
-}
-
-function convertToCSV(objArray) {
-	var array = JSON.parse(objArray);
-	var agents = array.rows;
-	
-	var str = '';
-
-	for (var i = 0; i < agents.length; i++) {
-		var name = agents[i].key;
-		console.log('Name:' + name);
-		str += name + '\r\n';
-	}
-
-	return str;
-}
-/*
-http://127.0.0.1:5984/_utils/database.html?cren/_design/agent/_view/unverified
-http://127.0.0.1:5984/cren/_design/agent/_view/verified
-test file
-http://dl.dropbox.com/u/68198810/ActiveREBs_PUBLIC_1212.csv
-
-new file
-http://dl.dropbox.com/s/j3w7py5mosp62us/Active_REBs_PUBLIC_0113.csv
-*/
