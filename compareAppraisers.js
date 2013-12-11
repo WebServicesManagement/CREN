@@ -136,7 +136,7 @@ function getActiveREBs(crenAgents){
 	var resData = '';
 	
 	//send http requet to drop box to get agents spread sheet
-	http.get("https://dl.dropboxusercontent.com/sh/efdjzga9lclcu07/Wo2NF08DHC/Active_APPRs_PUBLIC.csv?dl=1", function(res) {
+	http.get("http://dl.dropboxusercontent.com/sh/efdjzga9lclcu07/Wo2NF08DHC/Active_APPRs_PUBLIC.csv?dl=1", function(res) {
 		console.log('LOADING REB Agents...');
 		res.on('data', function (chunk) {
 			resData += decoder.write(chunk);
@@ -210,7 +210,7 @@ function compareAgentLists(rebAgents,crenAgents){
 			rebLastName 	= rebAgentData[2];
 			
 			//if match on license then exit for loop and check next agent
-			if(agentLicenseId == rebLicenseId && in_array(agentAssID,validAgentTypes)){
+			if(agentLicenseId == rebLicenseId && validAgentTypes.indexOf([agentAssID])){
 				found = true;
 				
 				agent = '';
@@ -228,18 +228,14 @@ function compareAgentLists(rebAgents,crenAgents){
 			}
 			
 			//if no matching license but matching last name and office or first name or phone then add to potential match list
-			if(in_array(agentAssID,validAgentTypes)){
+			if(validAgentTypes.indexOf([agentAssID])){
 					semiInvalidAgents.push('\nCREN DATA: Name = ' + agentFirstName.toUpperCase() + 
 												' ' + agentLastName.toUpperCase() + 
-												' Office = ' + agentOffice.toUpperCase() + 
-												' Phone = ' + agentPhone.toUpperCase() + 
 												' License = ' + agentLicenseId.toUpperCase());
 												
 					
 					semiInvalidAgents[semiInvalidAgents.length-1] += '\nAppraiser DATA: Name = ' + rebFirstName + 
-												' ' + rebLastName.toUpperCase() + 
-												' Office = ' + rebOffice.toUpperCase() + 
-												' Phone = ' + rebPhone.toUpperCase() + 
+												' ' + rebLastName.toUpperCase() +  
 												' License =' + rebLicenseId;
 												
 					/*console.log(rebLastName.toLowerCase().replace(/[^\w\s]/gi, '') + ' == ' + agentLastName.toLowerCase().replace(/[^\w\s]/gi, '')
@@ -270,6 +266,7 @@ function compareAgentLists(rebAgents,crenAgents){
 	emailStr += invalidAgents.join('\n');
 	emailStr += '\n\nAgents found but with non matching license #s\n' + semiInvalidAgents.join('\n');
 	
+	console.log(emailStr);
 	//if invalid agents found send email
 	if(invalidAgents.length != 0){
 		sendEmail(invalidAgents.length,emailStr);
