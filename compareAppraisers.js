@@ -38,11 +38,11 @@ var server  = email.server.connect({
 
 });
 //email response
-var emailStr = 'Agents not found in REB file:\n';
+var emailStr = '';
 
 //arrays of agents not found in search
-var invalidAgents = new Array();
-var semiInvalidAgents = new Array();
+var appraisers = new Array();
+var appraisersWithNoMatch = new Array();
 
 //options for logging into CREN server
 var options = {
@@ -136,7 +136,7 @@ function getActiveREBs(crenAgents){
 	var resData = '';
 	
 	//send http requet to drop box to get agents spread sheet
-	http.get("http://dl.dropboxusercontent.com/sh/efdjzga9lclcu07/Wo2NF08DHC/Active_APPRs_PUBLIC.csv?dl=1", function(res) {
+	http.get("https://dl.dropboxusercontent.com/s/zc9a9uncnsepdvd/Active_APPRs_PUBLIC.csv?dl=1&token_hash=AAEsmbNB4vxfrItiAKIOLXgvAxYM-4i3bbESBRFWL3lKVA", function(res) {
 		console.log('LOADING REB Agents...');
 		res.on('data', function (chunk) {
 			resData += decoder.write(chunk);
@@ -161,11 +161,6 @@ function getActiveREBs(crenAgents){
 				compareAgentLists(rebAgents,crenAgents);
 				var fs = require('fs');
 				
-				//create local CREN cvs
-				fs.writeFile('CRENagents.cvs', crenAgents.join("\n"), function (err) {
-					if (err) throw err;
-					console.log('It\'s saved!');
-				});
 			})
 			.on('error', function(error){
 				console.log('ERR:' + error.message);
@@ -187,7 +182,9 @@ function compareAgentLists(rebAgents,crenAgents){
 	var rebAgentData;
 	console.log('Starting compare... ');
 	var agentsToInsert = new Array();
-
+	exact = '';
+	appraisers = '';
+	foundExact = false;
 	for (var j=0;j<crenAgents.length;j++)
 	{
 		row 			= crenAgents[j].split('\t');
@@ -199,78 +196,42 @@ function compareAgentLists(rebAgents,crenAgents){
 		agentPhone		= row[6];
 		agentAssID		= row[7];
 		
-		//console.log('********************* NEW AGENT ***************'); 
 		var found = false;
 		var semiFound = false;
+		console.log(agentAssID + ' ::: ' + validAgentTypes.indexOf(agentAssID));
 		for (var i=0;i<rebAgents.length;i++)
 		{
 			rebAgentData 	= rebAgents[i];
-			rebLicenseId 	= rebAgentData[0];
-			rebFirstName 	= rebAgentData[1];
-			rebLastName 	= rebAgentData[2];
+			rebLicenseId 	= rebAgentData[1];
+			rebFirstName 	= rebAgentData[2];
+			rebLastName 	= rebAgentData[3];
 			
-			//if match on license then exit for loop and check next agent
-			if(agentLicenseId == rebLicenseId && validAgentTypes.indexOf([agentAssID])){
-				found = true;
+			
+			//exact match
+			if(agentLicenseId == rebLicenseId 
+				&& validAgentTypes.indexOf(agentAssID) != -1){
+				exact += 'Appraiser License: ' 
+						 + rebLicenseId + ' Name : ' + rebFirstName + ' ' 
+						 + rebLastName + '\n' ;
 				
-				agent = '';
-				
-				//if found in other matches remove from list
-				if(semiFound){
-					agent = semiInvalidAgents.pop();
-				
-				}
-				
-				//console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@ FOUND @@@@@@@@@@@@@@@@@@@@@@@@@@@ ' + semiInvalidAgents[semiInvalidAgents.length-1]);
-				//console.log(agent); 
-				break;
-				
+				foundExact = true;
 			}
-			
-			//if no matching license but matching last name and office or first name or phone then add to potential match list
-			if(validAgentTypes.indexOf([agentAssID])){
-					semiInvalidAgents.push('\nCREN DATA: Name = ' + agentFirstName.toUpperCase() + 
-												' ' + agentLastName.toUpperCase() + 
-												' License = ' + agentLicenseId.toUpperCase());
-												
-					
-					semiInvalidAgents[semiInvalidAgents.length-1] += '\nAppraiser DATA: Name = ' + rebFirstName + 
-												' ' + rebLastName.toUpperCase() +  
-												' License =' + rebLicenseId;
-												
-					/*console.log(rebLastName.toLowerCase().replace(/[^\w\s]/gi, '') + ' == ' + agentLastName.toLowerCase().replace(/[^\w\s]/gi, '')
-						+ ' && ' +
-						rebOffice.toLowerCase().replace(/[^\w\s]/gi, '') + '  == ' + agentOffice.toLowerCase().replace(/[^\w\s]/gi, '')
-						+ ' || '
-						+ rebFirstName.toLowerCase().replace(/[^\w\s]/gi, '') + ' ' + agentFirstName.toLowerCase().replace(/[^\w\s]/gi, '').substring(0,3)
-						+ ' || '
-						+ rebPhone + ' :: ' + agentPhone);*/
-					
-					semiFound = true;
-					found = true;
-					
-			}
-			
 		}
 		
-		// if not found add to invalid agent list
-		if(!found){
-			invalidAgents.push(agentFirstName.toUpperCase() + ' ' + agentLastName.toUpperCase());
+		if(!foundExact && validAgentTypes.indexOf(agentAssID) != -1){
+			appraisers += 'Appraiser Name : ' + rebFirstName + ' ' + 
+						rebLastName + ' Type : ' + agentAssID + '\n';	
+				
 		}
 		
-		row[6] = found;
-		agentsToInsert.push(row);
+		foundExact = false;
 	}
+	emailStr += 'Appraisers with exact match\n';
+	emailStr += exact;
+	emailStr += '\n\nAppraisers without match\n';
+	emailStr += appraisers;
+	sendEmail(emailStr);
 	
-	invalidAgents.sort();
-	emailStr += invalidAgents.join('\n');
-	emailStr += '\n\nAgents found but with non matching license #s\n' + semiInvalidAgents.join('\n');
-	
-	console.log(emailStr);
-	//if invalid agents found send email
-	if(invalidAgents.length != 0){
-		sendEmail(invalidAgents.length,emailStr);
-	}
 }
 
 /**
@@ -279,12 +240,12 @@ function compareAgentLists(rebAgents,crenAgents){
  * @param agentCount  Integer of agents missing
  * @param message  String of the message to send
  */
-function sendEmail(agentCount,message){
+function sendEmail(message){
 	server.send({
 	text:    message, 
 	from:    "sysadmin@webservicesmanagement.com", 
 	//to:      "Jeff Follis <jeff@crenmls.com>,Robin Martinez <robin@crenmls.com>", 
 	cc:      "pcjones10@gmail.com",
-	subject: agentCount + " CREN Agents not found in Appraiser file for " + todaysDate
+	subject: "Appraiser file for " + todaysDate
 	}, function(err, message) { console.log(err || message); });
 }
