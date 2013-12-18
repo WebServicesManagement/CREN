@@ -19,7 +19,7 @@ var csv = require('csv');
 //CREN credentials
 var USERNAME = "lynxgeo";
 var PASSWORD = "mapperjm";
-var validAgentTypes = ['26','36','41','51','56','66','86','96','102','121','110','111'];
+var validAgentTypes = ["26","36","41","51","56","66","86","96","102","121","110","111"];
 
 //Store current date
 var currentTime = new Date();
@@ -81,7 +81,7 @@ function getCRENAgents() {
 	var options = {
 	  hostname: 'cren.rets.fnismls.com',
 	  //  path: '/rets/fnisrets.aspx/CREN/GetMetadata?rets-version=rets/1.7.2&Format=COMPACT&Type=METADATA-SYSTEM&ID=*',
-	  path: '/rets/fnisrets.aspx/CREN/search?rets-version=rets/1.7.2&Format=COMPACT&QueryType=DMQL2&SearchType=ActiveAgent&class=ActiveAgent&StandardNames=0&Query=(U_Status=M,S)&Select=U_AgentLicenseID,U_Status,U_UserFirstName,U_UserLastName,AO_OrganizationName,U_PhoneNumber1,U_HiddenUsCID&Limit=NONE&ID=*',
+	  path: '/rets/fnisrets.aspx/CREN/search?rets-version=rets/1.7.2&Format=COMPACT&QueryType=DMQL2&SearchType=ActiveAgent&class=ActiveAgent&StandardNames=0&Query=(U_Status=*)&Select=U_AgentLicenseID,U_Status,U_UserFirstName,U_UserLastName,AO_OrganizationName,U_PhoneNumber1,U_HiddenUsCID&Limit=NONE&ID=*',
 	  port: 80,
 	  method: 'GET',
 	  headers: {
@@ -136,7 +136,7 @@ function getActiveREBs(crenAgents){
 	var resData = '';
 	
 	//send http requet to drop box to get agents spread sheet
-	http.get("https://dl.dropboxusercontent.com/s/zc9a9uncnsepdvd/Active_APPRs_PUBLIC.csv?dl=1&token_hash=AAEsmbNB4vxfrItiAKIOLXgvAxYM-4i3bbESBRFWL3lKVA", function(res) {
+	http.get("http://dl.dropboxusercontent.com/s/zc9a9uncnsepdvd/Active_APPRs_PUBLIC.csv?dl=1&token_hash=AAEsmbNB4vxfrItiAKIOLXgvAxYM-4i3bbESBRFWL3lKVA", function(res) {
 		console.log('LOADING REB Agents...');
 		res.on('data', function (chunk) {
 			resData += decoder.write(chunk);
@@ -198,7 +198,7 @@ function compareAgentLists(rebAgents,crenAgents){
 		
 		var found = false;
 		var semiFound = false;
-		console.log(agentAssID + ' ::: ' + validAgentTypes.indexOf(agentAssID));
+		console.log(agentAssID + ' ::: ' + validAgentTypes.indexOf(agentAssID) + ' !!! ' + validAgentTypes);
 		for (var i=0;i<rebAgents.length;i++)
 		{
 			rebAgentData 	= rebAgents[i];
@@ -209,27 +209,27 @@ function compareAgentLists(rebAgents,crenAgents){
 			
 			//exact match
 			if(agentLicenseId == rebLicenseId 
-				&& validAgentTypes.indexOf(agentAssID) != -1){
+				&& validAgentTypes.indexOf(agentAssID.toString().trim()) != -1){
 				exact += 'Appraiser License: ' 
-						 + rebLicenseId + ' Name : ' + rebFirstName + ' ' 
-						 + rebLastName + '\n' ;
-				
-				foundExact = true;
+						 + rebLicenseId + ', Name : ' + rebFirstName + ' ' 
+						 + rebLastName+ ', Type : ' + agentAssID + '\n' ;
+				found = true;
 			}
+			
 		}
-		
-		if(!foundExact && validAgentTypes.indexOf(agentAssID) != -1){
-			appraisers += 'Appraiser Name : ' + rebFirstName + ' ' + 
-						rebLastName + ' Type : ' + agentAssID + '\n';	
-				
+	
+		if(!found && validAgentTypes.indexOf(agentAssID.toString().trim()) != -1){
+			appraisers += 'CREN License: ' + agentLicenseId + ' != ' + rebLicenseId
+						 +', Appraiser Name : ' + agentFirstName + ' ' + 
+						agentLastName + ', Type : ' + agentAssID + '\n';	
 		}
-		
 		foundExact = false;
 	}
-	emailStr += 'Appraisers with exact match\n';
-	emailStr += exact;
-	emailStr += '\n\nAppraisers without match\n';
+	
+	emailStr += 'Appraisers without matching license\n';
 	emailStr += appraisers;
+	emailStr += '\n\nAppraisers with matching license\n';
+	emailStr += exact;
 	sendEmail(emailStr);
 	
 }
