@@ -135,7 +135,7 @@ function getActiveREBs(crenAgents){
 	var resData = '';
 	
 	//send http requet to drop box to get agents spread sheet
-	http.get("http://dl.dropboxusercontent.com/s/xqk6hdcgy0403p0/Active_REBs_PUBLIC.csv.csv?dl=1", function(res) {
+	http.get("http://dl.dropboxusercontent.com/s/b1sd3rmac3i3far/Active_REBs_PUBLIC.csv?dl=1&token_hash=AAFt7njMxGzWE4mFtEjjc9ym4lM4-JU7vJBNt-YIb8K-xQ", function(res) {
 		console.log('LOADING REB Agents...');
 		res.on('data', function (chunk) {
 			resData += decoder.write(chunk);
