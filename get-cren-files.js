@@ -2,6 +2,7 @@ console.log('JOB STARTED');
 
 //http request object
 var http = require('http');
+var https = require('https');
 
 //file system object
 var fs = require('fs');
@@ -135,7 +136,8 @@ function getActiveREBs(crenAgents){
 	var resData = '';
 	
 	//send http requet to drop box to get agents spread sheet
-	http.get("http://dl.dropboxusercontent.com/s/b1sd3rmac3i3far/Active_REBs_PUBLIC.csv?dl=1&token_hash=AAFt7njMxGzWE4mFtEjjc9ym4lM4-JU7vJBNt-YIb8K-xQ", function(res) {
+	https.get("https://dl.dropboxusercontent.com/s/b1sd3rmac3i3far/Active_REBs_PUBLIC.csv?dl=1&token_hash=AAFt7njMxGzWE4mFtEjjc9ym4lM4-JU7vJBNt-YIb8K-xQ", function(res) {
+	//http.get("http://dl.dropboxusercontent.com/s/xqk6hdcgy0403p0/Active_REBs_PUBLIC.csv?dl=1", function(res) {
 		console.log('LOADING REB Agents...');
 		res.on('data', function (chunk) {
 			resData += decoder.write(chunk);
@@ -205,9 +207,10 @@ function compareAgentLists(rebAgents,crenAgents){
 			rebAgentData 	= rebAgents[i];
 			rebFirstName 	= rebAgentData[1];
 			rebLastName 	= rebAgentData[2];
-			rebOffice 		= rebAgentData[3];
-			rebPhone 		= rebAgentData[9];
-			rebLicenseId 	= rebAgentData[10];
+			rebMiddleName 	= rebAgentData[3];
+			rebOffice 		= rebAgentData[4];
+			rebPhone 		= rebAgentData[10];
+			rebLicenseId 	= rebAgentData[11];
 			
 			//console.log(agentLicenseId + ' == ' + rebLicenseId);
 			
@@ -298,7 +301,7 @@ function sendEmail(agentCount,message){
 	server.send({
 	text:    message, 
 	from:    "sysadmin@webservicesmanagement.com", 
-	//to:      "Jeff Follis <jeff@crenmls.com>,Robin Martinez <robin@crenmls.com>", 
+	to:      "Jeff Follis <jeff@crenmls.com>,Robin Martinez <robin@crenmls.com>", 
 	cc:      "pcjones10@gmail.com,nathan@webservicesmanagement.com,sam@thewebmgr.com",
 	subject: agentCount + " CREN Agents not found in REB file for " + todaysDate
 	}, function(err, message) { console.log(err || message); });
